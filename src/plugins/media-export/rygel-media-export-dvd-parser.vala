@@ -75,10 +75,8 @@ internal class Rygel.DVDParser : GLib.Object {
         delete doc;
     }
 
-    public async Xml.Doc* get_information () throws Error {
+    public async void get_information () throws Error {
         if (!this.cache_file.query_exists ()) {
-            var launcher = new SubprocessLauncher (SubprocessFlags.STDERR_SILENCE);
-            launcher.set_stdout_file_path (this.cache_file.get_path ());
             string[] args = {
                 DVDParser.lsdvd_binary_path,
                 "-Ox",
@@ -89,8 +87,11 @@ internal class Rygel.DVDParser : GLib.Object {
                 null
             };
 
-            var process = launcher.spawnv (args);
-            yield process.wait_async ();
+            var process = new Subprocess.newv (args, SubprocessFlags.STDOUT_PIPE);
+
+            string buffer;
+
+            yield process.communicate_utf8_async (null, null, out buffer, null);
 
             if (!(process.get_if_exited () &&
                 process.get_exit_status () == 0)) {
@@ -101,17 +102,48 @@ internal class Rygel.DVDParser : GLib.Object {
                 }
                 throw new DVDParserError.GENERAL ("lsdvd did die or file is not a DVD");
             }
-        }
 
-        yield this.query_length ();
-
-        return Xml.Parser.read_file (this.cache_file.get_path (),
-                                     null,
-                                     Xml.ParserOption.NOERROR |
+            var doc = Xml.Parser.read_memory (buffer,
+                                              buffer.length,
+                                              null,
+                                              "UTF-8",
+                                              Xml.ParserOption.NOERROR |
                                      Xml.ParserOption.NOWARNING |
                                      Xml.ParserOption.RECOVER |
                                      Xml.ParserOption.NOENT |
                                      Xml.ParserOption.NONET);
+            var context = new Xml.XPath.Context (doc);
+            var result = context.eval_expression ("/lsdvd/track");
+
+            if (result != null) {
+                if (result->type == Xml.XPath.ObjectType.NODESET &&
+                    result->nodesetval->length () == 1) {
+                    var node = result->nodesetval->item (0);
+                    try {
+                        var duration = yield this.query_length ();
+                        var duration_node = doc->new_node (null,
+                                                           "rygel:bytelength",
+                                                           "%lld".printf (duration));
+                        node->add_child (duration_node);
+                    } catch (Error error) {
+                        warning (_("Failed to query length from DVD: %s"),
+                                 error.message);
+                    }
+                }
+
+                delete result;
+            }
+
+            doc->dump_memory_enc_format (out buffer, null, "UTF-8", true);
+            delete doc;
+
+            yield this.cache_file.replace_contents_async (buffer.data,
+                                                          null,
+                                                          false,
+                                                          FileCreateFlags.NONE,
+                                                          null,
+                                                          null);
+         }
     }
 
     private async int64 query_length () throws Error {
