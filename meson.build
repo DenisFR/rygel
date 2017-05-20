@@ -29,6 +29,8 @@ gmodule = dependency('gmodule-2.0')
 libxml = dependency('libxml-2.0', version: '>= 2.7')
 posix = vala.find_library('posix')
 
+sed = find_program('sed')
+
 cc = meson.get_compiler('c')
 math = cc.find_library('m', required: false)
 

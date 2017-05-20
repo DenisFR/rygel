@@ -33,4 +33,9 @@ core_sources = [
 
 core_lib = library('rygel-core-2.6', core_sources,
         dependencies : core_deps,
-        include_directories: include_directories('../..'))
+        include_directories: include_directories('../..'),
+        version: '2.0.4',
+        vala_gir : 'Rygel-2.6.gir',
+        vala_header : 'rygel-core.h',
+        install: true,
+        install_dirs : [true, true, true, true])
