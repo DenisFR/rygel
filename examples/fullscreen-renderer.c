@@ -68,9 +68,9 @@ static void on_realize (GtkWidget *widget, gpointer user_data)
         g_error ("Could not create native window for overlay");
 
     if (GDK_IS_WAYLAND_WINDOW (window)) {
-        window_handle = gdk_wayland_window_get_wl_surface (window);
+        window_handle = (guintptr) gdk_wayland_window_get_wl_surface (window);
     } else if (GDK_IS_X11_WINDOW (window)) {
-        window_handle = GDK_WINDOW_XID (window);
+        window_handle = (guintptr) GDK_WINDOW_XID (window);
     } else {
         g_error ("Unsupported windowing system");
     }
@@ -115,6 +115,8 @@ static gboolean on_draw (GtkWidget *widget, cairo_t *cr, gpointer user_data)
 
         cairo_paint (cr);
     }
+
+    return TRUE;
 }
 
 static gboolean on_key_released (GtkWidget *widget,
@@ -138,8 +140,6 @@ static gboolean on_key_released (GtkWidget *widget,
 int main (int argc, char *argv[])
 {
     RygelPlaybinRenderer *renderer;
-    GError *error = NULL;
-    GMainLoop *loop;
     MainData data;
     GdkCursor *cursor;
 
@@ -153,7 +153,6 @@ int main (int argc, char *argv[])
 
     data.window = GTK_WINDOW (gtk_window_new (GTK_WINDOW_TOPLEVEL));
     data.video = gtk_drawing_area_new ();
-    gtk_widget_set_double_buffered (data.video, FALSE);
     gtk_container_add (GTK_CONTAINER (data.window), data.video);
     g_signal_connect (data.video, "realize", G_CALLBACK (on_realize), &data);
     gtk_widget_add_events (data.video,
